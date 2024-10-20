@@ -1,7 +1,7 @@
 <?php
 // Include necessary libraries and functions
-require "./includes/library.php";
-include "../header.php";
+require "../../includes/water-rats-db.php";
+include "../../includes/header.php";
 
 // Fetch all competitors, days, and race results in fewer queries
 $competitorsQuery = "SELECT * FROM `Competitors`";

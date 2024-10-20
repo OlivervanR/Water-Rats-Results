@@ -5,8 +5,8 @@ session_start();
 $errors = array();
 
 // Include necessary libraries and functions
-require "./includes/library.php";
-include "../header.php";
+require "../../includes/water-rats-db.php";
+include "../../includes/header.php";
 
 // Set the values from form
 $name = $_POST['name'] ?? "";

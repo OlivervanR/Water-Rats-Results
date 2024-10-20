@@ -2,8 +2,8 @@
 $errors = array();
 
 // Include necessary libraries and functions
-require "./includes/library.php";
-include "../header.php";
+require "../../includes/water-rats-db.php";
+include "../../includes/header.php";
 
 // Set the values for the form
 $date = $_POST['date'] ?? "";

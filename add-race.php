@@ -2,8 +2,8 @@
 $errors = array();
 
 // Include necessary libraries and functions
-require "./includes/library.php";
-include "../header.php";
+require "../../includes/water-rats-db.php";
+include "../../includes/header.php";
 
 // Get day id
 $day_id = $_GET['guid'];

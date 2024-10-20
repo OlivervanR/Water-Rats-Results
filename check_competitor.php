@@ -1,8 +1,8 @@
 <?php
 header('Content-Type: application/json');
 
-require "./includes/library.php";
-require "../header.php";
+require "../../includes/water-rats-db.php";
+include "../../includes/header.php";
 
 $sail_num = $_GET['sail_num'] ?? '';
 
