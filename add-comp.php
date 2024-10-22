@@ -1,6 +1,13 @@
 <?php
 session_start();
 
+// Check if the user is logged in
+if (!isset($_SESSION['user'])) {
+    // If not logged in, redirect to main page
+    header('Location: index.php');
+    exit();
+}
+
 // Create an empty array for the list of errors
 $errors = array();
 

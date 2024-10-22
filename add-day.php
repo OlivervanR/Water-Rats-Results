@@ -1,4 +1,13 @@
 <?php
+session_start();
+
+// Check if the user is logged in
+if (!isset($_SESSION['user'])) {
+    // If not logged in, redirect to main page
+    header('Location: index.php');
+    exit();
+}
+
 $errors = array();
 
 // Include necessary libraries and functions
@@ -64,14 +73,14 @@ if (isset($_POST['submit'])) {
     </form>
 
     <h2>All Days</h2>
-    <div>
+    <div class="horizontal">
         <?php foreach ($days as $day) {
             $d_day_id = htmlspecialchars($day['Day_Id']);
             $d_date = htmlspecialchars($day['Date']);
             $d_num_comp = htmlspecialchars($day['Num_Comp']);
             $d_num_races = htmlspecialchars($day['Num_Races']);
             ?>
-            <div>
+            <div class="item">
                 <h3>Day <?=$d_day_id?></h3>
                 <div><?=$d_date?></div>
                 <div><?=$d_num_comp?> competitors</div>

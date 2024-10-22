@@ -66,3 +66,14 @@ h1 {
     margin-top: 5px;
 }
 
+div.horizontal {
+    display: grid;
+    grid-auto-flow: column;
+    gap: 10px;
+    overflow-x:auto;
+}
+
+div.item {
+    text-align: center;
+    padding: 20px;
+}

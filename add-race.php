@@ -1,4 +1,41 @@
 <?php
+session_start();
+
+function addComp($pdo, $sail_num, $race_id, $position, $notation=null) {
+    // Insert the new competitor into the Competitors table
+    $query = "INSERT INTO `Competitors` (`Name`, `Number`) VALUES (?, ?)";
+    $stmt_insert = $pdo->prepare($query);
+    $stmt_insert->execute(["", $sail_num]);
+    $competitor_id = $pdo->lastInsertId();
+
+    // Add the competitor to the current race with the correct position
+    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, 'Notation`) VALUES (?, ?, ?, ?)";
+    $stmt_insert_race = $pdo->prepare($query);
+    $stmt_insert_race->execute([$race_id, $position, $competitor_id, $notation]);
+
+    // Set position for other races
+    $query = "SELECT * FROM `Races` WHERE `Race_Id` != ?";
+    $stmt = $pdo->prepare($query);
+    $stmt->execute([$race_id]);
+    $other_races = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($other_races as $other_race) {
+        $dnc = $other_race['DNC'];
+        $other_race_id = $other_race['Race_Id'];
+
+        $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
+        $stmt_insert_race = $pdo->prepare($query);
+        $stmt_insert_race->execute([$other_race_id, $dnc, $competitor_id, "DNC"]);
+    }
+}
+
+// Check if the user is logged in
+if (!isset($_SESSION['user'])) {
+    // If not logged in, redirect to main page
+    header('Location: index.php');
+    exit();
+}
+
 $errors = array();
 
 // Include necessary libraries and functions
@@ -50,31 +87,7 @@ if (isset($_POST['submit'])) {
             $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($competitor == null) {
-                // Insert the new competitor into the Competitors table
-                $query = "INSERT INTO `Competitors` (`Name`, `Number`) VALUES (?, ?)";
-                $stmt_insert = $pdo->prepare($query);
-                $stmt_insert->execute(["", $sail_num]);
-                $competitor_id = $pdo->lastInsertId();
-
-                // Add the competitor to the current race with the correct position
-                $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`) VALUES (?, ?, ?)";
-                $stmt_insert_race = $pdo->prepare($query);
-                $stmt_insert_race->execute([$race_id, $position, $competitor_id]);
-
-                // Set position for other races
-                $query = "SELECT * FROM `Races` WHERE `Race_Id` != ?";
-                $stmt = $pdo->prepare($query);
-                $stmt->execute([$race_id]);
-                $other_races = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                foreach ($other_races as $other_race) {
-                    $dnc = $other_race['DNC'];
-                    $other_race_id = $other_race['Race_Id'];
-
-                    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`) VALUES (?, ?, ?)";
-                    $stmt_insert_race = $pdo->prepare($query);
-                    $stmt_insert_race->execute([$other_race_id, $dnc, $competitor_id]);
-                }
+                addComp($pdo, $sail_num, $race_id, $position);
 
             } else {
                 $competitor_id = $competitor['Comp_Id'];
@@ -106,12 +119,38 @@ if (isset($_POST['submit'])) {
     // Calculate the maximum position
     $max_position = $position; // Since $position was incremented after the last competitor
 
+    // add each OCS race result
+    foreach ($_POST['ocs_num'] as $i => $sail_num) {
+        if ($sail_num != '') {
+            // Find the competitor
+            $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
+            $stmt = $pdo->prepare($query);
+            $stmt->execute([$sail_num]);
+            $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($competitor == null) {
+                addComp($pdo, $sail_num, $race_id, $position, "OCS");
+
+            } else {
+                $competitor_id = $competitor['Comp_Id'];
+
+                // Add the competitor to the current race with the correct position
+                $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
+                $stmt_insert = $pdo->prepare($query);
+                $stmt_insert->execute([$race_id, $position, $competitor_id, "OCS"]);
+            }
+
+            // Add the competitor to the list of included competitors
+            $included_competitors[] = $competitor_id;
+        }
+    }
+
     // Find competitors not included in the form and assign them the maximum position
     foreach ($all_competitors as $comp_id) {
         if (!in_array($comp_id, $included_competitors)) {
-            $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`) VALUES (?, ?, ?)";
+            $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
             $stmt_insert = $pdo->prepare($query);
-            $stmt_insert->execute([$race_id, $max_position, $comp_id]);
+            $stmt_insert->execute([$race_id, $max_position, $comp_id, 'DNC']);
         }
     }
 
@@ -134,12 +173,12 @@ if (isset($_POST['submit'])) {
 
     <h1>Add Race</h1>
     <p>Please enter the last 4 digits of the competitors' sail numbers</p>
-    <form method="post">
+    <form id="race-form" method="post">
         <div id="sail-rows">
             <?php foreach (range(1, $num_comp) as $i) { ?>
                 <div class="row">
                     <label for="sail_num<?=$i?>"><?=$i?></label>
-                    <input type="text" name="sail_num[]"?>
+                    <input type="text" name="sail_num[]">
                 </div>
             <?php } ?>
         </div>
@@ -147,6 +186,18 @@ if (isset($_POST['submit'])) {
             <button type="button" id="add-row">Add Row</button>
             <button type="button" id="delete-row">Delete Row</button>
         </div>
+        
+        <p>If any boats were over early (OCS), enter them here</p>
+        <div id="ocs">
+            <div class="row">
+                <input type="text" name="ocs_num[]">
+            </div>
+        </div>
+        <div>
+            <button type="button" id="add-row-2">Add Row</button>
+            <button type="button" id="delete-row-2">Delete Row</button>
+        </div>
+
         <button type="submit" name="submit">Add Race</button>
     </form>
 
@@ -163,11 +214,48 @@ if (isset($_POST['submit'])) {
             sailRows.appendChild(newRow);
         });
 
+        document.getElementById('add-row-2').addEventListener('click', function() {
+            const sailRows = document.getElementById('ocs');
+            const rowCount = sailRows.children.length + 1;
+            const newRow = document.createElement('div');
+            newRow.className = 'row';
+            newRow.innerHTML = `
+                <input type="text" name="ocs_num[]" />
+            `;
+            sailRows.appendChild(newRow);
+        });
+
         document.getElementById('delete-row').addEventListener('click', function() {
             const sailRows = document.getElementById('sail-rows');
             if (sailRows.children.length > 0) {
                 sailRows.removeChild(sailRows.lastElementChild);
             }
+        });
+
+        document.getElementById('delete-row-2').addEventListener('click', function() {
+            const sailRows = document.getElementById('ocs');
+            if (sailRows.children.length > 0) {
+                sailRows.removeChild(sailRows.lastElementChild);
+            }
+        });
+
+        // Select all input fields inside the form
+        const inputs = document.querySelectorAll('#race-form input');
+
+        // Add keydown event to each input field
+        inputs.forEach((input, index) => {
+            input.addEventListener('keydown', function(event) {
+                // Check if the key is 'Enter'
+                if (event.key === 'Enter') {
+                    event.preventDefault();  // Prevent form submission
+
+                    // Focus on the next input, if available
+                    const nextInput = inputs[index + 1];
+                    if (nextInput) {
+                        nextInput.focus();
+                    }
+                }
+            });
         });
     </script>
 </body>

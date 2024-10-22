@@ -1,4 +1,7 @@
 <?php
+// Check for login
+session_start();
+
 // Include necessary libraries and functions
 require "../../includes/water-rats-db.php";
 include "../../includes/header.php";
@@ -37,6 +40,8 @@ foreach ($raceResults as $result) {
     <title>Laser Results</title>
 </head>
 <body>
+    <?php include 'nav.php'; ?> 
+    
     <h1>Final Results</h1>
     <p style="text-align: center;">For the Water Rats Laser club racing</p>
 
@@ -209,13 +214,14 @@ foreach ($raceResults as $result) {
             
             $total = 0;
             $race_positions = []; // Array to hold positions for each race
+            $notations = [];
             $dnc_total = 0;
 
             foreach ($races as $race) {
                 $race_id = htmlspecialchars($race['Race_Id']);
                 $race_dnc = htmlspecialchars($race['DNC']);
 
-                $query = "SELECT `Position` FROM `Race Results` WHERE `Race_Id` = ? AND `Comp_Id` = ?";
+                $query = "SELECT * FROM `Race Results` WHERE `Race_Id` = ? AND `Comp_Id` = ?";
                 $stmt = $pdo->prepare($query);
                 $stmt->execute([$race_id, $comp_id]);
                 $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -223,6 +229,10 @@ foreach ($raceResults as $result) {
                 if ($result && isset($result['Position'])) {
                     $position = (int)htmlspecialchars($result['Position']);
                     $race_positions[$race_id] = $position;  // Key race positions by Race_Id
+
+                    $notation = $result['Notation'];
+                    $notations[$race_id] = $notation;    
+
                     $dnc_total += $race_dnc;
                     $total += $position;  // Sum positions to calculate the total
                 } else {
@@ -234,6 +244,7 @@ foreach ($raceResults as $result) {
             $competitorData[] = [
                 'name' => $name,
                 'number' => $number,
+                'notations' => $notations,
                 'race_positions' => $race_positions,
                 'total' => $total,
                 'dnc' => $dnc_total
@@ -316,11 +327,11 @@ foreach ($raceResults as $result) {
                     <?php foreach ($races as $race) { 
                         $race_id = htmlspecialchars($race['Race_Id']); ?>
                         <td>
-                            <?php if ($comp['race_positions'][$race_id] != $list_dnc[$race_id]) { 
+                            <?php if ($comp['notations'][$race_id] == null) { 
                                 echo $comp['race_positions'][$race_id]; // Output the position if not DNC
-                            } else { ?>
-                                DNC (<?=$comp['race_positions'][$race_id]?>)
-                            <?php } ?>
+                            } else { 
+                                echo $comp['notations'][$race_id], " (", ($comp['race_positions'][$race_id]), ")";
+                            } ?>
                         </td>
                     <?php } ?>
                     <td><b><?=$comp['total']?></b></td> <!-- Display total points for the day -->
