@@ -1,4 +1,5 @@
 <?php
+ini_set('session.save_path',realpath(dirname($_SERVER['DOCUMENT_ROOT']) . '../../session'));
 session_start();
 
 function addComp($pdo, $sail_num, $race_id, $position, $notation=null) {
@@ -172,8 +173,8 @@ if (isset($_POST['submit'])) {
     <?php include 'nav.php'; ?> 
 
     <h1>Add Race</h1>
-    <p>Please enter the last 4 digits of the competitors' sail numbers</p>
     <form id="race-form" method="post">
+        <p>Please enter the last 4 digits of the competitors' sail numbers</p>
         <div id="sail-rows">
             <?php foreach (range(1, $num_comp) as $i) { ?>
                 <div class="row">

@@ -1,10 +1,6 @@
 <?php
 $errors = array();
 
-// Include necessary libraries and functions
-require "../../includes/water-rats-db.php";
-include "../../includes/header.php";
-
 $password = $_POST['password'] ?? "";
 
 // if user submits post
@@ -13,6 +9,7 @@ if(isset($_POST['submit'])) {
     $hash_password = password_hash($c_password, PASSWORD_DEFAULT);
     if (password_verify($password, $hash_password)) {
         // start the session
+        ini_set('session.save_path',realpath(dirname($_SERVER['DOCUMENT_ROOT']) . '../../session'));
         session_start();
         $_SESSION['user'] = true;
 

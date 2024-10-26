@@ -1,5 +1,5 @@
 <?php
-// Check for login
+ini_set('session.save_path',realpath(dirname($_SERVER['DOCUMENT_ROOT']) . '../../session'));
 session_start();
 
 // Include necessary libraries and functions
@@ -148,7 +148,6 @@ foreach ($raceResults as $result) {
         return count($positionsA) <=> count($positionsB);
     });
     ?>
-
     <table>
         <tr>
             <th>Rank</th>

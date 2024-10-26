@@ -1,6 +1,4 @@
 <?php
-session_start();
-
 header('Content-Type: application/json');
 
 require "../../includes/water-rats-db.php";

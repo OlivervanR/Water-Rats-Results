@@ -1,4 +1,5 @@
 <?php
+ini_set('session.save_path',realpath(dirname($_SERVER['DOCUMENT_ROOT']) . '../../session'));
 session_start();
 
 // Check if the user is logged in
@@ -48,7 +49,7 @@ if (isset($_POST['submit'])) {
         }
 
         // Redirect to the index page after processing
-        header("Location: index.php");
+        header("Location: add-comp.php");
         exit;
     }
 }
@@ -76,8 +77,54 @@ if (isset($_POST['submit'])) {
             <span class="error <?= !isset($errors['number']) ? 'hidden' : '' ?>">Please enter a sail #.</span>
         </div>
 
-        <button type="submit" name="submit">Add Competitor</button>
+        <button type="submit" name="submit">Add</button>
     </form>
+
+    <h1>List of Competitors</h1>
+    <table>
+        <tr>
+            <th>Competitor Name</th>
+            <th>Sail Number</th>
+            <th>Actions</th>
+        <?php
+        $query = "SELECT * FROM `Competitors`";
+        $stmt = $pdo->prepare($query);
+        $stmt->execute();
+        $competitors = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($competitors as $comp) {
+            $comp_id = htmlspecialchars($comp['Comp_Id']);
+            $name = htmlspecialchars($comp['Name']);
+            $number = htmlspecialchars($comp['Number']);
+            ?>
+            <tr>
+                <td><?=$name?></td> 
+                <td><?=$number?></td>
+                <td>
+                <div id="right-links">
+                    <a href="edit-comp.php?guid=<?= $comp_id ?>"><img src="images/edit.svg" alt="Edit"></a>
+                    <a id="delete-comp" href="delete-comp.php?guid=<?= $comp_id ?>" onclick="confirmDeletion(event, this.href)">
+                        <img src="images/trash.svg" alt="Delete">
+                    </a>
+                </div>
+                </td>
+            </tr>
+        <?php } ?>
+    </table>
+
+    <script>
+        function confirmDeletion(event, url) {
+            // Display a confirmation dialog
+            const userConfirmed = confirm("Are you sure you want to delete this Client?");
+            // If the user did not confirm, prevent the navigation
+            if (!userConfirmed) {
+                event.preventDefault();
+            } else {
+                // If the user confirmed, redirect to the delete URL
+                window.location.href = url;
+            }
+        }
+    </script>
 </body>
 </html>
 

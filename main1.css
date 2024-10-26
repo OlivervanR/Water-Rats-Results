@@ -77,3 +77,7 @@ div.item {
     text-align: center;
     padding: 20px;
 }
+
+form {
+    text-align: center;
+}
