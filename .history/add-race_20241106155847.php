@@ -114,6 +114,11 @@ if (isset($_POST['submit'])) {
         $num_comp = count($included_competitors);
     }
 
+    // Get all competitors
+    $query = "SELECT `Comp_Id` FROM `Competitors`";
+    $stmt = $pdo->query($query);
+    $all_competitors = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
     // add each OCS race result
     foreach ($_POST['ocs_num'] as $i => $sail_num) {
         if ($sail_num != '') {
@@ -139,11 +144,6 @@ if (isset($_POST['submit'])) {
             $included_competitors[] = $competitor_id;
         }
     }
-
-    // Get all competitors
-    $query = "SELECT `Comp_Id` FROM `Competitors`";
-    $stmt = $pdo->query($query);
-    $all_competitors = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
     // Find competitors not included in the form and assign them the maximum position
     foreach ($all_competitors as $comp_id) {

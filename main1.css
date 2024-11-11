@@ -1,3 +1,6 @@
+body {
+    margin-top: 0;
+}
 .error {
     display: inline-block;
     color: red;
@@ -18,9 +21,7 @@
 
 table {
     border-collapse: collapse;
-    width: 50%;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 auto;
 }
 
 th {
@@ -67,17 +68,55 @@ h1 {
 }
 
 div.horizontal {
-    display: grid;
-    grid-auto-flow: column;
+    display: flex;
     gap: 10px;
-    overflow-x:auto;
-}
-
-div.item {
-    text-align: center;
-    padding: 20px;
 }
 
 form {
     text-align: center;
+}
+
+div.horizontal {
+    display: flex;
+    gap: 10px;
+}
+
+form {
+    text-align: center;
+}
+
+nav {
+    display: flex;
+    flex-direction: row;
+    background-color: #891B1B;
+}
+
+nav ul {
+    display: flex;
+    flex-grow: 1;
+    list-style-type: none;
+}
+
+nav ul li:nth-last-child(1) {
+    margin-left: auto;
+}
+
+nav li a {
+    text-decoration: none;
+    font-size: 1.2em;
+    padding: 0.7em;
+    color: white;
+}
+
+nav li a:hover {
+    background-color: black;
+}
+
+.logo {
+    height: 60px;
+}
+
+.table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling for iOS */
 }
