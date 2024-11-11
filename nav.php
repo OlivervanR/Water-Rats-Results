@@ -1,7 +1,8 @@
 <nav>
+    <img class="logo" src="images/logo.png"/>
     <ul>
         <li>
-            <a href="index.php">Total Results</a>
+            <a href="index.php">Results</a>
         </li>
         <?php if(isset($_SESSION['user'])): ?>
         <li>
