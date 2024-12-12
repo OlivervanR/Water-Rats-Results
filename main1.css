@@ -1,6 +1,10 @@
 body {
     margin-top: 0;
 }
+
+main {
+    padding-top: 100px;
+}
 .error {
     display: inline-block;
     color: red;
@@ -89,6 +93,9 @@ nav {
     display: flex;
     flex-direction: row;
     background-color: #891B1B;
+    position: fixed; 
+    top: 0; 
+    width: 100%; 
 }
 
 nav ul {
@@ -119,4 +126,23 @@ nav li a:hover {
 .table-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch; /* Smooth scrolling for iOS */
+}
+
+.button {
+    background-color: #555555; 
+    border: none;
+    color: white;
+    padding: 10px;
+    margin: 5px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    border-radius: 4px;
+    transition-duration: 0.4s;
+}
+
+.button:hover {
+    background-color: red; /* Green */
+    color: black;
 }

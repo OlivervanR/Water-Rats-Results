@@ -8,15 +8,13 @@ include "../../includes/header.php";
 
 $guid = $_GET['guid'];
 
-$query = "DELETE FROM `Competitors` WHERE `Comp_Id` = ?";
+$query = "DELETE FROM `Days` WHERE `Day_Id` = ?";
 $stmt = $pdo->prepare($query);
 $stmt->execute([$guid]);
 
-$query = "DELETE FROM `Race Results` WHERE `Comp_Id` = ?";
+$query = "DELETE FROM `Races` WHERE `Day_Id` = ?";
 $stmt = $pdo->prepare($query);
 $stmt->execute([$guid]);
 
-// reduce the number of competitors by one for the races
-
-header("Location:add-comp.php");
+header("Location:index.php");
 exit();

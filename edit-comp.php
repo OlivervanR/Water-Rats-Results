@@ -51,6 +51,9 @@ if (isset($_POST['submit'])) {
     <title>Edit Competitor</title>
 </head>
 <body>
+    <?php include 'nav.php'; ?>     
+
+    <main>
     <h1>Edit Competitor</h1>
     <form id="form" method="post">
         <div>
@@ -65,5 +68,6 @@ if (isset($_POST['submit'])) {
 
         <button type="submit" name="submit">Update</button>
     </form>
+    </main>
 </body>
 </html>

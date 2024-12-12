@@ -32,22 +32,6 @@ if (isset($_POST['submit'])) {
         $stmt_insert->execute([$name, $number]);
         $competitor_id = $pdo->lastInsertId();
 
-        // Retrieve all previous races
-        $query = "SELECT * FROM `Races`";
-        $stmt = $pdo->query($query);
-        $races = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // For each race, add the new competitor with the maximum position
-        foreach ($races as $race) {
-            $race_id = htmlspecialchars($race['Race_Id']);
-            $dnc = htmlspecialchars($race['DNC']);
-
-            // Insert the new competitor into the race results with the max position
-            $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`) VALUES (?, ?, ?)";
-            $stmt_insert_race = $pdo->prepare($query);
-            $stmt_insert_race->execute([$race_id, $dnc, $competitor_id]);
-        }
-
         // Redirect to the index page after processing
         header("Location: add-comp.php");
         exit;
@@ -65,6 +49,7 @@ if (isset($_POST['submit'])) {
 <body>
     <?php include 'nav.php' ?> 
 
+    <main>
     <h1>Add Competitor</h1>
     <form id="form" method="post">
         <div>
@@ -111,6 +96,7 @@ if (isset($_POST['submit'])) {
             </tr>
         <?php } ?>
     </table>
+    </main>
 
     <script>
         function confirmDeletion(event, url) {

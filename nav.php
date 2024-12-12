@@ -6,10 +6,7 @@
         </li>
         <?php if(isset($_SESSION['user'])): ?>
         <li>
-            <a href="add-day.php">Add Race Day</a>
-        </li>
-        <li>
-            <a href="add-comp.php">Add Competitor</a>
+            <a href="add-comp.php">Competitors</a>
         </li>
         <li>
             <a href="logout.php">Logout</a>

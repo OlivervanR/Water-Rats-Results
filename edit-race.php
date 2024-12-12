@@ -2,28 +2,12 @@
 ini_set('session.save_path',realpath(dirname($_SERVER['DOCUMENT_ROOT']) . '../../session'));
 session_start();
 
-function addComp($pdo, $sail_num, $race_id, &$competitor_id) {
+function addComp($pdo, $sail_num, &$competitor_id) {
     // Insert the new competitor into the Competitors table
     $query = "INSERT INTO `Competitors` (`Name`, `Number`) VALUES (?, ?)";
     $stmt_insert = $pdo->prepare($query);
     $stmt_insert->execute(["", $sail_num]);
     $competitor_id = $pdo->lastInsertId();
-
-    // Set position for other races
-    $query = "SELECT * FROM `Races` WHERE `Race_Id` != ?";
-    $stmt = $pdo->prepare($query);
-    $stmt->execute([$race_id]);
-    $other_races = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Add DNC positions for all the other races
-    foreach ($other_races as $other_race) {
-        $dnc = $other_race['DNC'];
-        $other_race_id = $other_race['Race_Id'];
-
-        $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
-        $stmt_insert_race = $pdo->prepare($query);
-        $stmt_insert_race->execute([$other_race_id, $dnc, $competitor_id, "DNC"]);
-    }
 }
 
 // Check if the user is logged in
@@ -84,8 +68,9 @@ foreach ($race_results as $race_result) {
     }
 }
 
-var_dump($og_rr);
-var_dump($og_ocs);
+// Testing purposes
+//var_dump($og_rr);
+//var_dump($og_ocs);
 
 // Get the day from the race
 $query = "SELECT * FROM `Days` WHERE `Day_Id` = ?";
@@ -96,131 +81,126 @@ $day = $stmt->fetch(PDO::FETCH_ASSOC);
 $num_comp = $day['Num_Comp'];
 
 if (isset($_POST['submit'])) {
-    $position = 1;
-    $ranked_competitors = [];
+    // Filter out empty values
+    $sail_nums = array_filter($_POST['sail_num'], function ($value) {
+        return $value !== ''; // Keep only non-empty values
+    });
 
-    // Check to see if position needs to be updated
-    foreach ($_POST['sail_num'] as $i => $sail_num) {
-        if ($sail_num != '') {
-            // Find the competitor
-            $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
-            $stmt = $pdo->prepare($query);
-            $stmt->execute([$sail_num]);
-            $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Count occurrences of each value
+    $counts = array_count_values($sail_nums);
 
-            $competitor_id = $competitor['Comp_Id'];    
-            $competitor_number = $competitor['Number'];
-            
-            if ($sail_num != ($og_rr[$position]['number'] ?? null)) {
-                if ($competitor == null) {
-                    addComp($pdo, $sail_num, $race_id, $competitor_id);
-                } 
-                elseif (!in_array($competitor_id, array_column($og_rr, 'id'))) {
+    // Find duplicates
+    $duplicates = array_filter($counts, function ($count) {
+        return $count > 1;
+    });
+
+    // Check for errors
+    if (!empty($duplicates)) {
+        $errors['duplicate'] = true;
+    }
+    else {
+        $position = 1;
+        $ranked_competitors = [];
+
+        // Check to see if position needs to be updated
+        foreach ($_POST['sail_num'] as $i => $sail_num) {
+            if ($sail_num != '') {
+                // Find the competitor
+                $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
+                $stmt = $pdo->prepare($query);
+                $stmt->execute([$sail_num]);
+                $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                $competitor_id = $competitor['Comp_Id'];    
+                $competitor_number = $competitor['Number'];
+                
+                if ($sail_num != ($og_rr[$position]['number'] ?? null)) {
+                    if ($competitor == null) {
+                        addComp($pdo, $sail_num, $competitor_id);
+                    } 
+                    elseif (!in_array($competitor_id, array_column($og_rr, 'id'))) {
+                        // Delete the old race result
+                        $query = "DELETE FROM `Race Results` WHERE `Race_Id` = ? AND `Comp_Id` = ?";
+                        $stmt = $pdo->prepare($query);
+                        $stmt->execute([$race_id, $competitor_id]);
+                    }
+
+                    if (count($ranked_competitors) < count($og_rr)) {
+                        // Update the result with a different competitor
+                        $query = "UPDATE `Race Results` SET `Comp_Id` = ? WHERE `Race_Id` = ? AND `Position` = ?";
+                        $stmt = $pdo->prepare($query);
+                        $stmt->execute([$competitor_id, $race_id, $position]);
+                    }
+                    else {
+                        // Add the new race result
+                        $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`) VALUES (?, ?, ?)";
+                        $stmt_insert = $pdo->prepare($query);
+                        $stmt_insert->execute([$race_id, $position, $competitor_id]);
+                    }
+                }
+                
+                // Add the competitor to the list of included competitors
+                $ranked_competitors[] = $competitor_id;
+
+                // Increment position for the next competitor
+                $position++;
+            } 
+        }
+        
+        $ocs_competitors = [];
+
+        // Add each OCS resuls
+        foreach ($_POST['ocs_num'] as $i => $sail_num) {
+            if ($sail_num != '') {
+                // Find the competitor
+                $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
+                $stmt = $pdo->prepare($query);
+                $stmt->execute([$sail_num]);
+                $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                $competitor_id = $competitor['Comp_Id'];
+
+                if (!in_array($competitor_id, array_column($og_ocs, 'id'))) {
+                    if ($competitor == null) {
+                        addComp($pdo, $sail_num, $race_id, $competitor_id);
+                    }
+                    
+                    if (in_array($competitor_id, $ranked_competitors)) {
+                        // Error exit 
+                    }
                     // Delete the old race result
                     $query = "DELETE FROM `Race Results` WHERE `Race_Id` = ? AND `Comp_Id` = ?";
                     $stmt = $pdo->prepare($query);
                     $stmt->execute([$race_id, $competitor_id]);
-                }
-
-                if (count($ranked_competitors) < count($og_rr)) {
-                    // Update the result with a different competitor
-                    $query = "UPDATE `Race Results` SET `Comp_Id` = ? WHERE `Race_Id` = ? AND `Position` = ?";
-                    $stmt = $pdo->prepare($query);
-                    $stmt->execute([$competitor_id, $race_id, $position]);
-                }
-                else {
-                    // Add the new race result
-                    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`) VALUES (?, ?, ?)";
+                    
+                    // Add the competitor to the current race with the correct position
+                    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
                     $stmt_insert = $pdo->prepare($query);
-                    $stmt_insert->execute([$race_id, $position, $competitor_id]);
+                    $stmt_insert->execute([$race_id, $position, $competitor_id, "OCS"]);
                 }
+
+                // Add the competitor to the list of included competitors
+                $ocs_competitors[] = $competitor_id;
             }
-            
-            // Add the competitor to the list of included competitors
-            $ranked_competitors[] = $competitor_id;
+        }
 
-            // Increment position for the next competitor
-            $position++;
-        } 
-    }
-    
-    $ocs_competitors = [];
+        $included_competitors = $ranked_competitors + $ocs_competitors;
 
-    // Add each OCS resuls
-    foreach ($_POST['ocs_num'] as $i => $sail_num) {
-        if ($sail_num != '') {
-            // Find the competitor
-            $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
+        // Update the DNC value
+        $query = "UPDATE `Races` SET `DNC` = ? WHERE `Race_Id` = ?";
+        $stmt_insert = $pdo->prepare($query);
+        $stmt_insert->execute([$position, $race_id]);
+        
+        if (count($included_competitors) > $day['Num_Comp']) {
+            $query = "UPDATE `Days` SET `Num_Comp` = ? WHERE `Day_Id` = ?";
             $stmt = $pdo->prepare($query);
-            $stmt->execute([$sail_num]);
-            $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            $competitor_id = $competitor['Comp_Id'];
-
-            if (!in_array($competitor_id, array_column($og_ocs, 'id'))) {
-                if ($competitor == null) {
-                    addComp($pdo, $sail_num, $race_id, $competitor_id);
-                }
-                
-                if (in_array($competitor_id, $ranked_competitors)) {
-                    // Error exit 
-                }
-                // Delete the old race result
-                $query = "DELETE FROM `Race Results` WHERE `Race_Id` = ? AND `Comp_Id` = ?";
-                $stmt = $pdo->prepare($query);
-                $stmt->execute([$race_id, $competitor_id]);
-                
-                // Add the competitor to the current race with the correct position
-                $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
-                $stmt_insert = $pdo->prepare($query);
-                $stmt_insert->execute([$race_id, $position, $competitor_id, "OCS"]);
-            }
-
-            // Add the competitor to the list of included competitors
-            $ocs_competitors[] = $competitor_id;
+            $stmt->execute([count($included_competitors), $day_id]);
         }
+
+        // Redirect after processing
+        header("Location: index.php");
+        exit;
     }
-
-    $included_competitors = $ranked_competitors + $ocs_competitors;
-
-    // Update the DNC value
-    $query = "UPDATE `Races` SET `DNC` = ? WHERE `Race_Id` = ?";
-    $stmt_insert = $pdo->prepare($query);
-    $stmt_insert->execute([$position, $race_id]);
-
-    // Get all competitors
-    $query = "SELECT `Comp_Id` FROM `Competitors`";
-    $stmt = $pdo->query($query);
-    $all_competitors = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    // Find competitors not included in the form and assign them the DNC position
-    foreach ($all_competitors as $comp_id) {
-        if (!in_array($comp_id, $included_competitors)) {
-            $query = "UPDATE `Race Results` SET `Position` = ?, `Notation` = ? WHERE `Race_Id` = ? AND `Comp_Id` = ?";
-            $stmt_insert = $pdo->prepare($query);
-            $stmt_insert->execute([$position, 'DNC', $race_id, $comp_id]);
-        }
-    }
-    
-    if (count($included_competitors) > $day['Num_Comp']) {
-        $query = "UPDATE `Days` SET `Num_Comp` = ? WHERE `Day_Id` = ?";
-        $stmt = $pdo->prepare($query);
-        $stmt->execute([count($included_competitors), $day_id]);
-    }
-
-    // If an original competitor isn't included in the race anymore, give them the DNC position 
-    if (!empty($og_rr) && $difs = array_diff(array_column($og_rr, 'Comp_Id'), $included_competitors)) {
-        foreach ($difs as $dif) {
-            $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
-            $stmt_insert = $pdo->prepare($query);
-            $stmt_insert->execute([$race_id, $position, $dif, 'DNC']);
-        }
-    }
-
-    // Redirect after processing
-    header("Location: index.php");
-    exit;
-    
 }
 ?>
 <!DOCTYPE html>
@@ -234,25 +214,31 @@ if (isset($_POST['submit'])) {
 <body>
     <?php include 'nav.php'; ?> 
 
+    <main>
     <h1>Edit Race</h1>
     <form id="race-form" method="post">
         <p>Please enter the last 4 digits of the competitors' sail numbers</p>
         <div id="sail-rows">
-            <?php 
-            // Generate input fields, pre-filling values with existing data if available
-            foreach (range(1, $num_comp) as $i) { 
-                $sail_num = isset($og_rr[$i]) ? $og_rr[$i]['number'] : ""; // Get existing data or leave blank
+            <?php
+            // Iterate over the competitors, either from user input ($_POST) or existing race results ($og_rr)
+            foreach (range(0, $num_comp - 1) as $i) { // Use 0-based indexing for $og_rr
+                // Check if user input exists for this row or fall back to race result data
+                $sail_num = isset($_POST['sail_num'][$i]) ? $_POST['sail_num'][$i] : (isset($og_rr[$i+1]) ? $og_rr[$i+1]['number'] : '');
+
+                // Generate the input field for each sail number
             ?>
                 <div class="row">
-                    <label for="sail_num<?=$i?>"><?=$i?></label>
+                    <label for="sail_num<?=$i?>"><?=$i + 1?></label> <!-- Display the correct race number -->
                     <input type="number" max="9999" name="sail_num[]" value="<?= htmlspecialchars($sail_num) ?>">
                 </div>
-            <?php } ?>
+            <?php 
+            }
+            ?>
         </div>
         
         <div>
-            <button type="button" id="add-row">Add Row</button>
-            <button type="button" id="delete-row">Delete Row</button>
+            <button type="button" id="add-row" class="button">Add Row</button>
+            <button type="button" id="delete-row" class="button">Delete Row</button>
         </div>
         
         <p>If any boats were over early (OCS), enter them here</p>
@@ -263,12 +249,13 @@ if (isset($_POST['submit'])) {
         </div>
         
         <div>
-            <button type="button" id="add-row-2">Add Row</button>
-            <button type="button" id="delete-row-2">Delete Row</button>
+            <button type="button" id="add-row-2" class="button">Add Row</button>
+            <button type="button" id="delete-row-2" class="button">Delete Row</button>
         </div>
 
-        <button type="submit" name="submit">Done</button>
+        <button type="submit" name="submit" class="button">Done</button>
     </form>
+    </main>
 
     <script>
         document.getElementById('add-row').addEventListener('click', function() {

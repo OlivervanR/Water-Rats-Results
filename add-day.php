@@ -41,7 +41,7 @@ if (isset($_POST['submit'])) {
         $query = "INSERT INTO `Days` (`Day_Id`, `Date`, `Num_Comp`) VALUES (?, ?, ?)";
         $stmt_insert = $pdo->prepare($query);
         $stmt_insert->execute([$day_id, $date, $num_comp]);
-        header("Location: " . $_SERVER['PHP_SELF']);
+        header("Location: index.php");
         exit;
     }
 }
@@ -57,6 +57,7 @@ if (isset($_POST['submit'])) {
 <body>
     <?php include 'nav.php' ?> 
 
+    <main>
     <h1>Add Day</h1>
     <form id="form" method="post">
         <div>
@@ -102,5 +103,6 @@ if (isset($_POST['submit'])) {
             </div>
         <?php } ?>
     </div>
+    </main>
 </body>
 </html>

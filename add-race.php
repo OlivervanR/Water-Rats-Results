@@ -13,21 +13,6 @@ function addComp($pdo, $sail_num, $race_id, $position, $notation=null) {
     $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, 'Notation`) VALUES (?, ?, ?, ?)";
     $stmt_insert_race = $pdo->prepare($query);
     $stmt_insert_race->execute([$race_id, $position, $competitor_id, $notation]);
-
-    // Set position for other races
-    $query = "SELECT * FROM `Races` WHERE `Race_Id` != ?";
-    $stmt = $pdo->prepare($query);
-    $stmt->execute([$race_id]);
-    $other_races = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    foreach ($other_races as $other_race) {
-        $dnc = $other_race['DNC'];
-        $other_race_id = $other_race['Race_Id'];
-
-        $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
-        $stmt_insert_race = $pdo->prepare($query);
-        $stmt_insert_race->execute([$other_race_id, $dnc, $competitor_id, "DNC"]);
-    }
 }
 
 // Check if the user is logged in
@@ -57,106 +42,116 @@ $race_num = $day['Num_Races'] + 1;
 
 // Add race to database
 if (isset($_POST['submit'])) {
-    // Add the race to the day
-    $query = "INSERT INTO `Races` (`Day_Id`, `Race_Number`) VALUES (?, ?)";
-    $stmt_insert = $pdo->prepare($query);
-    $stmt_insert->execute([$day_id, $race_num]);
-    $race_id = $pdo->lastInsertId();
+    // Filter out empty values
+    $sail_nums = array_filter($_POST['sail_num'], function ($value) {
+        return $value !== ''; // Keep only non-empty values
+    });
 
-    // Update the race count for the day
-    $query = "UPDATE `Days` SET `Num_Races` = ? WHERE `Day_Id` = ?";
-    $stmt_insert = $pdo->prepare($query);
-    $stmt_insert->execute([$race_num, $day_id]);
+    // Count occurrences of each value
+    $counts = array_count_values($sail_nums);
 
-    $position = 1;
-    $included_competitors = [];
+    // Find duplicates
+    $duplicates = array_filter($counts, function ($count) {
+        return $count > 1;
+    });
 
-    // Add each race result
-    foreach ($_POST['sail_num'] as $i => $sail_num) {
-        if ($sail_num != '') {
-            // Find the competitor
-            $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
-            $stmt = $pdo->prepare($query);
-            $stmt->execute([$sail_num]);
-            $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($competitor == null) {
-                addComp($pdo, $sail_num, $race_id, $position);
-
-            } else {
-                $competitor_id = $competitor['Comp_Id'];
-
-                // Add the competitor to the current race with the correct position
-                $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`) VALUES (?, ?, ?)";
-                $stmt_insert = $pdo->prepare($query);
-                $stmt_insert->execute([$race_id, $position, $competitor_id]);
-            }
-            
-            // Add the competitor to the list of included competitors
-            $included_competitors[] = $competitor_id;
-
-            // Increment position for the next competitor
-            $position++;
-        }
+    // Check for errors
+    if (!empty($duplicates)) {
+        $errors['duplicate'] = true;
     }
-
-    // Update the DNC
-    $query = "UPDATE `Races` SET `DNC` = ? WHERE `Race_Id` = ?";
-    $stmt_insert = $pdo->prepare($query);
-    $stmt_insert->execute([$position, $race_id]);
-
-    // Update the number of competitors
-    if (count($included_competitors) > $day['Num_Comp']) {
-        $query = "UPDATE `Days` SET `Num_Comp` = ? WHERE `Day_Id` = ?";
+    else {
+        // Add the race to the day
+        $query = "INSERT INTO `Races` (`Day_Id`, `Race_Number`) VALUES (?, ?)";
         $stmt_insert = $pdo->prepare($query);
-        $stmt_insert->execute([count($included_competitors), $day_id]);
+        $stmt_insert->execute([$day_id, $race_num]);
+        $race_id = $pdo->lastInsertId();
 
-        $num_comp = count($included_competitors);
-    }
+        // Update the race count for the day
+        $query = "UPDATE `Days` SET `Num_Races` = ? WHERE `Day_Id` = ?";
+        $stmt_insert = $pdo->prepare($query);
+        $stmt_insert->execute([$race_num, $day_id]);
 
-    // add each OCS race result
-    foreach ($_POST['ocs_num'] as $i => $sail_num) {
-        if ($sail_num != '') {
-            // Find the competitor
-            $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
-            $stmt = $pdo->prepare($query);
-            $stmt->execute([$sail_num]);
-            $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
+        $position = 1;
+        $included_competitors = [];
 
-            if ($competitor == null) {
-                addComp($pdo, $sail_num, $race_id, $position, "OCS");
+        // Add each race result
+        foreach ($_POST['sail_num'] as $i => $sail_num) {
+            if ($sail_num != '') {
+                // Find the competitor
+                $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
+                $stmt = $pdo->prepare($query);
+                $stmt->execute([$sail_num]);
+                $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            } else {
-                $competitor_id = $competitor['Comp_Id'];
+                if ($competitor == null) {
+                    addComp($pdo, $sail_num, $race_id, $position);
+                }
+                else {
+                    $competitor_id = $competitor['Comp_Id'];
 
-                // Add the competitor to the current race with the correct position
-                $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
-                $stmt_insert = $pdo->prepare($query);
-                $stmt_insert->execute([$race_id, $position, $competitor_id, "OCS"]);
+                    // Add the competitor to the current race with the correct position
+                    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`) VALUES (?, ?, ?)";
+                    $stmt_insert = $pdo->prepare($query);
+                    $stmt_insert->execute([$race_id, $position, $competitor_id]);
+                }
+                
+                // Add the competitor to the list of included competitors
+                $included_competitors[] = $competitor_id;
+
+                // Increment position for the next competitor
+                $position++;
             }
-
-            // Add the competitor to the list of included competitors
-            $included_competitors[] = $competitor_id;
         }
-    }
 
-    // Get all competitors
-    $query = "SELECT `Comp_Id` FROM `Competitors`";
-    $stmt = $pdo->query($query);
-    $all_competitors = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        // Update the DNC
+        $query = "UPDATE `Races` SET `DNC` = ? WHERE `Race_Id` = ?";
+        $stmt_insert = $pdo->prepare($query);
+        $stmt_insert->execute([$position, $race_id]);
 
-    // Find competitors not included in the form and assign them the maximum position
-    foreach ($all_competitors as $comp_id) {
-        if (!in_array($comp_id, $included_competitors)) {
-            $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
+        // Update the number of competitors
+        if (count($included_competitors) > $day['Num_Comp']) {
+            $query = "UPDATE `Days` SET `Num_Comp` = ? WHERE `Day_Id` = ?";
             $stmt_insert = $pdo->prepare($query);
-            $stmt_insert->execute([$race_id, $position, $comp_id, 'DNC']);
-        }
-    }
+            $stmt_insert->execute([count($included_competitors), $day_id]);
 
-    // Redirect after processing
-    header("Location: add-day.php");
-    exit;
+            $num_comp = count($included_competitors);
+        }
+
+        // add each OCS race result
+        foreach ($_POST['ocs_num'] as $i => $sail_num) {
+            if ($sail_num != '') {
+                // Find the competitor
+                $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
+                $stmt = $pdo->prepare($query);
+                $stmt->execute([$sail_num]);
+                $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($competitor == null) {
+                    addComp($pdo, $sail_num, $race_id, $position, "OCS");
+
+                } else {
+                    $competitor_id = $competitor['Comp_Id'];
+
+                    // Add the competitor to the current race with the correct position
+                    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
+                    $stmt_insert = $pdo->prepare($query);
+                    $stmt_insert->execute([$race_id, $position, $competitor_id, "OCS"]);
+                }
+
+                // Add the competitor to the list of included competitors
+                $included_competitors[] = $competitor_id;
+            }
+        }
+
+        // Get all competitors
+        $query = "SELECT `Comp_Id` FROM `Competitors`";
+        $stmt = $pdo->query($query);
+        $all_competitors = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        // Redirect after processing
+        header("Location: index.php");
+        exit;
+    }
 }
 
 ?>
@@ -171,14 +166,16 @@ if (isset($_POST['submit'])) {
 <body>
     <?php include 'nav.php'; ?> 
 
+    <main>
     <h1>Add Race</h1>
     <form id="race-form" method="post">
         <p>Please enter the last 4 digits of the competitors' sail numbers</p>
+        <span class="error <?= !isset($errors['duplicate']) ? 'hidden' : '' ?>">There was a duplicate entry, please enter again.</span>
         <div id="sail-rows">
             <?php foreach (range(1, $num_comp) as $i) { ?>
                 <div class="row">
                     <label for="sail_num<?=$i?>"><?=$i?></label>
-                    <input type="number" maxlength="4" name="sail_num[]">
+                    <input type="number" maxlength="4" name="sail_num[]" value="<?php echo isset($_POST['sail_num'][$i-1]) ? htmlspecialchars($_POST['sail_num'][$i-1]) : ''; ?>">
                 </div>
             <?php } ?>
         </div>
@@ -200,6 +197,7 @@ if (isset($_POST['submit'])) {
 
         <button type="submit" name="submit">Add Race</button>
     </form>
+    </main>
 
     <script>
         document.getElementById('add-row').addEventListener('click', function() {
