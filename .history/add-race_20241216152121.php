@@ -10,7 +10,7 @@ function addComp($pdo, $sail_num, $race_id, $position, $notation=null) {
     $competitor_id = $pdo->lastInsertId();
 
     // Add the competitor to the current race with the correct position
-    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
+    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, 'Notation`) VALUES (?, ?, ?, ?)";
     $stmt_insert_race = $pdo->prepare($query);
     $stmt_insert_race->execute([$race_id, $position, $competitor_id, $notation]);
 }
@@ -85,7 +85,7 @@ if (isset($_POST['submit'])) {
                 $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
 
                 // Logic based on the dropdown value for each competitor
-                if ($_POST['status'][$i] != "0") {
+                if (isset($_POST['status'][$i])) {
                     $status = $_POST['status'][$i];
                     
                     $other_competitors[] = [
@@ -144,6 +144,37 @@ if (isset($_POST['submit'])) {
             $num_comp = count($included_competitors);
         }
 
+        // add each OCS race result
+        foreach ($_POST['ocs_num'] as $i => $sail_num) {
+            if ($sail_num != '') {
+                // Find the competitor
+                $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
+                $stmt = $pdo->prepare($query);
+                $stmt->execute([$sail_num]);
+                $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($competitor == null) {
+                    addComp($pdo, $sail_num, $race_id, $position, "OCS");
+
+                } else {
+                    $competitor_id = $competitor['Comp_Id'];
+
+                    // Add the competitor to the current race with the correct position
+                    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
+                    $stmt_insert = $pdo->prepare($query);
+                    $stmt_insert->execute([$race_id, $position, $competitor_id, "OCS"]);
+                }
+
+                // Add the competitor to the list of included competitors
+                $included_competitors[] = $competitor_id;
+            }
+        }
+
+        // Get all competitors
+        $query = "SELECT `Comp_Id` FROM `Competitors`";
+        $stmt = $pdo->query($query);
+        $all_competitors = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
         // Redirect after processing
         header("Location: index.php");
         exit;
@@ -171,7 +202,7 @@ if (isset($_POST['submit'])) {
             <?php foreach (range(1, $num_comp) as $i) { ?>
                 <div class="row">
                     <label for="sail_num<?=$i?>"><?=$i?></label>
-                    <input type="number" max="9999" name="sail_num[]" value="<?php echo isset($_POST['sail_num'][$i-1]) ? htmlspecialchars($_POST['sail_num'][$i-1]) : ''; ?>">
+                    <input type="number" maxlength="4" name="sail_num[]" value="<?php echo isset($_POST['sail_num'][$i-1]) ? htmlspecialchars($_POST['sail_num'][$i-1]) : ''; ?>">
                     <select id="status<?=$i?>" name="status[]">
                         <option value="0" selected></option>
                         <option value="OCS">OCS</option>
@@ -186,6 +217,17 @@ if (isset($_POST['submit'])) {
         <div>
             <button type="button" id="add-row">Add Row</button>
             <button type="button" id="delete-row">Delete Row</button>
+        </div>
+        
+        <p>If any boats were over early (OCS), enter them here</p>
+        <div id="ocs">
+            <div class="row">
+                <input type="number" maxlength="4" name="ocs_num[]">
+            </div>
+        </div>
+        <div>
+            <button type="button" id="add-row-2">Add Row</button>
+            <button type="button" id="delete-row-2">Delete Row</button>
         </div>
 
         <button type="submit" name="submit">Add Race</button>
@@ -204,9 +246,27 @@ if (isset($_POST['submit'])) {
             `;
             sailRows.appendChild(newRow);
         });
-        
+
+        document.getElementById('add-row-2').addEventListener('click', function() {
+            const sailRows = document.getElementById('ocs');
+            const rowCount = sailRows.children.length + 1;
+            const newRow = document.createElement('div');
+            newRow.className = 'row';
+            newRow.innerHTML = `
+                <input type="text" name="ocs_num[]" />
+            `;
+            sailRows.appendChild(newRow);
+        });
+
         document.getElementById('delete-row').addEventListener('click', function() {
             const sailRows = document.getElementById('sail-rows');
+            if (sailRows.children.length > 0) {
+                sailRows.removeChild(sailRows.lastElementChild);
+            }
+        });
+
+        document.getElementById('delete-row-2').addEventListener('click', function() {
+            const sailRows = document.getElementById('ocs');
             if (sailRows.children.length > 0) {
                 sailRows.removeChild(sailRows.lastElementChild);
             }

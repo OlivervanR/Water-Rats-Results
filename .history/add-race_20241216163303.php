@@ -10,7 +10,7 @@ function addComp($pdo, $sail_num, $race_id, $position, $notation=null) {
     $competitor_id = $pdo->lastInsertId();
 
     // Add the competitor to the current race with the correct position
-    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
+    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, 'Notation`) VALUES (?, ?, ?, ?)";
     $stmt_insert_race = $pdo->prepare($query);
     $stmt_insert_race->execute([$race_id, $position, $competitor_id, $notation]);
 }
@@ -187,6 +187,17 @@ if (isset($_POST['submit'])) {
             <button type="button" id="add-row">Add Row</button>
             <button type="button" id="delete-row">Delete Row</button>
         </div>
+        
+        <p>If any boats were over early (OCS), enter them here</p>
+        <div id="ocs">
+            <div class="row">
+                <input type="number" maxlength="4" name="ocs_num[]">
+            </div>
+        </div>
+        <div>
+            <button type="button" id="add-row-2">Add Row</button>
+            <button type="button" id="delete-row-2">Delete Row</button>
+        </div>
 
         <button type="submit" name="submit">Add Race</button>
     </form>
@@ -204,9 +215,27 @@ if (isset($_POST['submit'])) {
             `;
             sailRows.appendChild(newRow);
         });
-        
+
+        document.getElementById('add-row-2').addEventListener('click', function() {
+            const sailRows = document.getElementById('ocs');
+            const rowCount = sailRows.children.length + 1;
+            const newRow = document.createElement('div');
+            newRow.className = 'row';
+            newRow.innerHTML = `
+                <input type="text" name="ocs_num[]" />
+            `;
+            sailRows.appendChild(newRow);
+        });
+
         document.getElementById('delete-row').addEventListener('click', function() {
             const sailRows = document.getElementById('sail-rows');
+            if (sailRows.children.length > 0) {
+                sailRows.removeChild(sailRows.lastElementChild);
+            }
+        });
+
+        document.getElementById('delete-row-2').addEventListener('click', function() {
+            const sailRows = document.getElementById('ocs');
             if (sailRows.children.length > 0) {
                 sailRows.removeChild(sailRows.lastElementChild);
             }

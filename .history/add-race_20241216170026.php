@@ -10,7 +10,7 @@ function addComp($pdo, $sail_num, $race_id, $position, $notation=null) {
     $competitor_id = $pdo->lastInsertId();
 
     // Add the competitor to the current race with the correct position
-    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
+    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, 'Notation`) VALUES (?, ?, ?, ?)";
     $stmt_insert_race = $pdo->prepare($query);
     $stmt_insert_race->execute([$race_id, $position, $competitor_id, $notation]);
 }

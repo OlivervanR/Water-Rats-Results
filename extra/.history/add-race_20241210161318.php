@@ -10,7 +10,7 @@ function addComp($pdo, $sail_num, $race_id, $position, $notation=null) {
     $competitor_id = $pdo->lastInsertId();
 
     // Add the competitor to the current race with the correct position
-    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
+    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, 'Notation`) VALUES (?, ?, ?, ?)";
     $stmt_insert_race = $pdo->prepare($query);
     $stmt_insert_race->execute([$race_id, $position, $competitor_id, $notation]);
 }
@@ -73,7 +73,6 @@ if (isset($_POST['submit'])) {
 
         $position = 1;
         $included_competitors = [];
-        $other_competitors = [];
 
         // Add each race result
         foreach ($_POST['sail_num'] as $i => $sail_num) {
@@ -84,49 +83,23 @@ if (isset($_POST['submit'])) {
                 $stmt->execute([$sail_num]);
                 $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                // Logic based on the dropdown value for each competitor
-                if ($_POST['status'][$i] != "0") {
-                    $status = $_POST['status'][$i];
-                    
-                    $other_competitors[] = [
-                        'id' => ($competitor == null) ? null : $competitor['Comp_Id'],
-                        'sail_num' => $sail_num,
-                        'notation' => $status
-                    ];
+                if ($competitor == null) {
+                    addComp($pdo, $sail_num, $race_id, $position);
                 }
-
                 else {
-                    if ($competitor == null) {
-                        addComp($pdo, $sail_num, $race_id, $position);
-                    }
-                    else {
-                        $competitor_id = $competitor['Comp_Id'];
-    
-                        // Add the competitor to the current race with the correct position
-                        $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`) VALUES (?, ?, ?)";
-                        $stmt_insert = $pdo->prepare($query);
-                        $stmt_insert->execute([$race_id, $position, $competitor_id]);
-                    }
-                    
-                    // Add the competitor to the list of included competitors
-                    $included_competitors[] = $competitor_id;
-    
-                    // Increment position for the next competitor
-                    $position++;
-                }
-            }
-        }
+                    $competitor_id = $competitor['Comp_Id'];
 
-        // Add competitors with abbreviations
-        foreach ($other_competitors as $competitor) {
-            if ($competitor['id'] == null) {
-                addComp($pdo, $competitor['sail_num'], $race_id, $position, $competitor['notation']);
-            }
-            else {
-                // Add the competitor to the current race with the DNC position
-                $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
-                $stmt_insert = $pdo->prepare($query);
-                $stmt_insert->execute([$race_id, $position, $competitor['id'], $competitor['notation']]);
+                    // Add the competitor to the current race with the correct position
+                    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`) VALUES (?, ?, ?)";
+                    $stmt_insert = $pdo->prepare($query);
+                    $stmt_insert->execute([$race_id, $position, $competitor_id]);
+                }
+                
+                // Add the competitor to the list of included competitors
+                $included_competitors[] = $competitor_id;
+
+                // Increment position for the next competitor
+                $position++;
             }
         }
 
@@ -143,6 +116,37 @@ if (isset($_POST['submit'])) {
 
             $num_comp = count($included_competitors);
         }
+
+        // add each OCS race result
+        foreach ($_POST['ocs_num'] as $i => $sail_num) {
+            if ($sail_num != '') {
+                // Find the competitor
+                $query = "SELECT * FROM `Competitors` WHERE `Number` = ?";
+                $stmt = $pdo->prepare($query);
+                $stmt->execute([$sail_num]);
+                $competitor = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($competitor == null) {
+                    addComp($pdo, $sail_num, $race_id, $position, "OCS");
+
+                } else {
+                    $competitor_id = $competitor['Comp_Id'];
+
+                    // Add the competitor to the current race with the correct position
+                    $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
+                    $stmt_insert = $pdo->prepare($query);
+                    $stmt_insert->execute([$race_id, $position, $competitor_id, "OCS"]);
+                }
+
+                // Add the competitor to the list of included competitors
+                $included_competitors[] = $competitor_id;
+            }
+        }
+
+        // Get all competitors
+        $query = "SELECT `Comp_Id` FROM `Competitors`";
+        $stmt = $pdo->query($query);
+        $all_competitors = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
         // Redirect after processing
         header("Location: index.php");
@@ -166,26 +170,28 @@ if (isset($_POST['submit'])) {
     <h1>Add Race</h1>
     <form id="race-form" method="post">
         <p>Please enter the last 4 digits of the competitors' sail numbers</p>
-        <span class="error <?= !isset($errors['duplicate']) ? 'hidden' : '' ?>">There was a duplicate entry, please enter again.</span>
         <div id="sail-rows">
             <?php foreach (range(1, $num_comp) as $i) { ?>
                 <div class="row">
                     <label for="sail_num<?=$i?>"><?=$i?></label>
-                    <input type="number" max="9999" name="sail_num[]" value="<?php echo isset($_POST['sail_num'][$i-1]) ? htmlspecialchars($_POST['sail_num'][$i-1]) : ''; ?>">
-                    <select id="status<?=$i?>" name="status[]">
-                        <option value="0" selected></option>
-                        <option value="OCS">OCS</option>
-                        <option value="DNS">DNS</option>
-                        <option value="DNF">DNF</option>
-                        <option value="DSQ">DSQ</option>
-                        <option value="BFD">BFD</option>
-                    </select>
+                    <input type="number" maxlength="4" name="sail_num[]">
                 </div>
             <?php } ?>
         </div>
         <div>
             <button type="button" id="add-row">Add Row</button>
             <button type="button" id="delete-row">Delete Row</button>
+        </div>
+        
+        <p>If any boats were over early (OCS), enter them here</p>
+        <div id="ocs">
+            <div class="row">
+                <input type="number" maxlength="4" name="ocs_num[]">
+            </div>
+        </div>
+        <div>
+            <button type="button" id="add-row-2">Add Row</button>
+            <button type="button" id="delete-row-2">Delete Row</button>
         </div>
 
         <button type="submit" name="submit">Add Race</button>
@@ -204,9 +210,27 @@ if (isset($_POST['submit'])) {
             `;
             sailRows.appendChild(newRow);
         });
-        
+
+        document.getElementById('add-row-2').addEventListener('click', function() {
+            const sailRows = document.getElementById('ocs');
+            const rowCount = sailRows.children.length + 1;
+            const newRow = document.createElement('div');
+            newRow.className = 'row';
+            newRow.innerHTML = `
+                <input type="text" name="ocs_num[]" />
+            `;
+            sailRows.appendChild(newRow);
+        });
+
         document.getElementById('delete-row').addEventListener('click', function() {
             const sailRows = document.getElementById('sail-rows');
+            if (sailRows.children.length > 0) {
+                sailRows.removeChild(sailRows.lastElementChild);
+            }
+        });
+
+        document.getElementById('delete-row-2').addEventListener('click', function() {
+            const sailRows = document.getElementById('ocs');
             if (sailRows.children.length > 0) {
                 sailRows.removeChild(sailRows.lastElementChild);
             }

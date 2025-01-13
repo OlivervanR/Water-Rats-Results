@@ -47,16 +47,6 @@ foreach ($raceResults as $result) {
 <body>
     <?php include 'nav.php'; ?> 
     
-    <main>
-    <div style="text-align: center;">
-        <button class="button" onclick="location.href='#target-section'">Results each day</button>
-        <label for="year" style="font-size: 20px;">Choose Year:</label>
-        <select name="year" id="year">
-            <option value="2023">2025</option>
-            <option value="2024">2024</option>
-            <option value="2025">2023</option>
-        </select>
-    </div>
     <h1>Final Results</h1>
     <p style="text-align: center;">For the Water Rats Laser club racing</p>
 
@@ -71,7 +61,6 @@ foreach ($raceResults as $result) {
         
         $final_total = 0;
         $totals_per_day = [];
-        $max_totals_per_day = [];
         $dropped_days = []; // To track dropped days
 
         foreach ($days as $day) {
@@ -83,7 +72,6 @@ foreach ($raceResults as $result) {
             $stmt->execute([$day_num]);
             $races = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $max_day_total = 0;
             foreach ($races as $race) {
                 $race_id = htmlspecialchars($race['Race_Id']);
                 $race_dnc = htmlspecialchars($race['DNC']);
@@ -97,12 +85,9 @@ foreach ($raceResults as $result) {
                 else {
                     $day_total += $race_dnc;
                 }
-
-                $max_day_total += $race_dnc;
             }
             $final_total += $day_total;
             $totals_per_day[$day_num] = $day_total;
-            $max_totals_per_day[$day_num] = $max_day_total;
         }
 
         // Determine the number of drops based on the total number of days
@@ -126,7 +111,6 @@ foreach ($raceResults as $result) {
             'number' => $number,
             'final_total' => $final_total,
             'totals_per_day' => $totals_per_day,
-            'max_totals_per_day' => $max_totals_per_day,
             'dropped_days' => $dropped_days
         ];
     }
@@ -202,12 +186,8 @@ foreach ($raceResults as $result) {
                 <?php foreach ($days as $day) {
                     $day_id = htmlspecialchars($day['Day_Id']);
                     $day_total = $comp['totals_per_day'][$day_id] ?? 0;
-                    $max_day_total = $comp['max_totals_per_day'][$day_id];
                 ?>
                     <td>
-                        <?php if ($day_total == $max_day_total) { 
-                            $day_total = 'DNC ' . $day_total;
-                        } ?>
                         <?php if (isset($comp['dropped_days'][$day_id])) { ?>
                             (<?=$day_total?>)
                         <?php } else { ?>
@@ -221,12 +201,8 @@ foreach ($raceResults as $result) {
         </table>
     </div>
     
-    <?php if (isset($_SESSION['user'])) { ?>
-        <div style="text-align: center; "><a href="add-day.php" class="button" style="font-size: 20px; padding: 10px 20px; display: inline-block; text-decoration: none; background-color: blue;">Add Day</a></div>
-    <?php } ?>
-    
     <!-- Day display carousel -->
-    <div id="target-section">
+    <div>
         <?php 
         // Sort the days array by date in descending order
         usort($days, function($a, $b) {
@@ -234,10 +210,10 @@ foreach ($raceResults as $result) {
         });
         
         foreach ($days as $day) {
-            $day_num = htmlspecialchars($day['Day_Id']);
-            $date = htmlspecialchars($day['Date']);
-            
             if ($day['Num_Races'] > 0) {
+                $day_num = htmlspecialchars($day['Day_Id']);
+                $date = htmlspecialchars($day['Date']);
+
                 // Select all the races on that day
                 $query = "SELECT * FROM `Races` WHERE `Day_Id` = ?";
                 $stmt = $pdo->prepare($query);
@@ -273,6 +249,7 @@ foreach ($raceResults as $result) {
                             $notation = $result['Notation'];
                             $notations[$race_id] = $notation;    
 
+                            $dnc_total += $race_dnc;
                             $total += $position;  // Sum positions to calculate the total
                         } else {
                             $race_positions[$race_id] = $race_dnc; // Use DNC if no position
@@ -282,8 +259,6 @@ foreach ($raceResults as $result) {
 
                             $total += $race_dnc;
                         }
-
-                        $dnc_total += $race_dnc;
                     }
 
                     // Store competitor data with positions for each race and total points
@@ -361,14 +336,9 @@ foreach ($raceResults as $result) {
                             <?php foreach ($races as $race) { ?>
                                 <th><a href="edit-race.php?guid=<?= $race['Race_Id'] ?>"><img src="images/edit.svg" alt="Edit"></a></th>
                             <?php } ?>
-                            <th>
-                                <a id="add-race" class="button" href="add-race.php?guid=<?= $day_num ?>" style="display: block; margin-bottom: 5px;">
-                                    Add Race
-                                </a>
-                                <a id="delete-race" class="button" href="delete-race.php?guid=<?= $day_num ?>" onclick="confirmDeletion(event, this.href)">
-                                    Delete Last Race
-                                </a>
-                            </th>
+                            <th><a id="delete-comp" href="delete-race.php?guid=<?= $day_num ?>" onclick="confirmDeletion(event, this.href)">
+                                Delete Last Race
+                            </a></th>
                         <?php } ?>
                         <tr>
                             <th>Rank</th>
@@ -381,6 +351,7 @@ foreach ($raceResults as $result) {
                         </tr>
 
                         <?php foreach ($competitorData as $index => $comp) {
+                            var_dump($comp); 
                             if ($comp['total'] != $comp['dnc']) { // Filter out competitors who only had DNCs
                             ?>
                             <tr>
@@ -393,7 +364,7 @@ foreach ($raceResults as $result) {
                                         <?php if ($comp['notations'][$race_id] == null) { 
                                             echo $comp['race_positions'][$race_id]; // Output the position if not DNC
                                         } else { 
-                                            echo $comp['notations'][$race_id], " ", ($comp['race_positions'][$race_id]);
+                                            echo $comp['notations'][$race_id], " (", ($comp['race_positions'][$race_id]), ")";
                                         } ?>
                                     </td>
                                 <?php } ?>
@@ -402,21 +373,8 @@ foreach ($raceResults as $result) {
                             <?php } ?>
                         <?php } ?>
                     </table>
+                    <a href="add-race.php?guid=<?= $day_num ?>"><img src="images/plus.svg" alt="Add"></a>
                 </div>
-            <?php } 
-            else { ?>
-                <?php if (isset($_SESSION['user'])) { ?>
-                    <div class="race-day-container">
-                        <h2>Day <?=$day_num?></h2>
-                        <div class="date"><?=$date?></div>
-                        <a id="add-race" class="button" href="add-race.php?guid=<?= $day_num ?>">
-                            Add Race
-                        </a>
-                        <a id="delete-day" class="button" href="delete-day.php?guid=<?= $day_num ?>" onclick="confirmDeletion(event, this.href)">
-                            Delete Day
-                        </a>
-                    </div>
-                <?php } ?>
             <?php } ?>
         <?php } ?>
     </div>
@@ -424,7 +382,7 @@ foreach ($raceResults as $result) {
     <script>
         function confirmDeletion(event, url) {
             // Display a confirmation dialog
-            const userConfirmed = confirm("Are you sure you want to delete?");
+            const userConfirmed = confirm("Are you sure you want to delete this Race?");
             // If the user did not confirm, prevent the navigation
             if (!userConfirmed) {
                 event.preventDefault();
@@ -434,7 +392,6 @@ foreach ($raceResults as $result) {
             }
         }
     </script>
-    </main>
 </body>
 </html>
 

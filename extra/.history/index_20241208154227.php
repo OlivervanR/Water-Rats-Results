@@ -48,15 +48,6 @@ foreach ($raceResults as $result) {
     <?php include 'nav.php'; ?> 
     
     <main>
-    <div style="text-align: center;">
-        <button class="button" onclick="location.href='#target-section'">Results each day</button>
-        <label for="year" style="font-size: 20px;">Choose Year:</label>
-        <select name="year" id="year">
-            <option value="2023">2025</option>
-            <option value="2024">2024</option>
-            <option value="2025">2023</option>
-        </select>
-    </div>
     <h1>Final Results</h1>
     <p style="text-align: center;">For the Water Rats Laser club racing</p>
 
@@ -222,11 +213,11 @@ foreach ($raceResults as $result) {
     </div>
     
     <?php if (isset($_SESSION['user'])) { ?>
-        <div style="text-align: center; "><a href="add-day.php" class="button" style="font-size: 20px; padding: 10px 20px; display: inline-block; text-decoration: none; background-color: blue;">Add Day</a></div>
+        <a>Add Day</a>
     <?php } ?>
     
     <!-- Day display carousel -->
-    <div id="target-section">
+    <div>
         <?php 
         // Sort the days array by date in descending order
         usort($days, function($a, $b) {
@@ -409,7 +400,7 @@ foreach ($raceResults as $result) {
                     <div class="race-day-container">
                         <h2>Day <?=$day_num?></h2>
                         <div class="date"><?=$date?></div>
-                        <a id="add-race" class="button" href="add-race.php?guid=<?= $day_num ?>">
+                        <a id="add-race" class="button" href="add-race.php?guid=<?= $day_num ?>" style="display: block; padding: 10px 0 5px 0">
                             Add Race
                         </a>
                         <a id="delete-day" class="button" href="delete-day.php?guid=<?= $day_num ?>" onclick="confirmDeletion(event, this.href)">

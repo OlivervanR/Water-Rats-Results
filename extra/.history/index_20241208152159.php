@@ -48,15 +48,6 @@ foreach ($raceResults as $result) {
     <?php include 'nav.php'; ?> 
     
     <main>
-    <div style="text-align: center;">
-        <button class="button" onclick="location.href='#target-section'">Results each day</button>
-        <label for="year" style="font-size: 20px;">Choose Year:</label>
-        <select name="year" id="year">
-            <option value="2023">2025</option>
-            <option value="2024">2024</option>
-            <option value="2025">2023</option>
-        </select>
-    </div>
     <h1>Final Results</h1>
     <p style="text-align: center;">For the Water Rats Laser club racing</p>
 
@@ -222,11 +213,11 @@ foreach ($raceResults as $result) {
     </div>
     
     <?php if (isset($_SESSION['user'])) { ?>
-        <div style="text-align: center; "><a href="add-day.php" class="button" style="font-size: 20px; padding: 10px 20px; display: inline-block; text-decoration: none; background-color: blue;">Add Day</a></div>
+        <a>Add Day</a>
     <?php } ?>
     
     <!-- Day display carousel -->
-    <div id="target-section">
+    <div>
         <?php 
         // Sort the days array by date in descending order
         usort($days, function($a, $b) {
@@ -362,10 +353,10 @@ foreach ($raceResults as $result) {
                                 <th><a href="edit-race.php?guid=<?= $race['Race_Id'] ?>"><img src="images/edit.svg" alt="Edit"></a></th>
                             <?php } ?>
                             <th>
-                                <a id="add-race" class="button" href="add-race.php?guid=<?= $day_num ?>" style="display: block; margin-bottom: 5px;">
+                                <a id="add-comp" href="add-race.php?guid=<?= $day_num ?>" style="display: block; margin-bottom: 5px;">
                                     Add Race
                                 </a>
-                                <a id="delete-race" class="button" href="delete-race.php?guid=<?= $day_num ?>" onclick="confirmDeletion(event, this.href)">
+                                <a id="delete-comp" href="delete-race.php?guid=<?= $day_num ?>" onclick="confirmDeletion(event, this.href)">
                                     Delete Last Race
                                 </a>
                             </th>
@@ -405,18 +396,13 @@ foreach ($raceResults as $result) {
                 </div>
             <?php } 
             else { ?>
-                <?php if (isset($_SESSION['user'])) { ?>
-                    <div class="race-day-container">
-                        <h2>Day <?=$day_num?></h2>
-                        <div class="date"><?=$date?></div>
-                        <a id="add-race" class="button" href="add-race.php?guid=<?= $day_num ?>">
-                            Add Race
-                        </a>
-                        <a id="delete-day" class="button" href="delete-day.php?guid=<?= $day_num ?>" onclick="confirmDeletion(event, this.href)">
-                            Delete Day
-                        </a>
-                    </div>
-                <?php } ?>
+                <div class="race-day-container">
+                    <h2>Day <?=$day_num?></h2>
+                    <div class="date"><?=$date?></div>
+                    <a id="add-comp" href="add-race.php?guid=<?= $day_num ?>" style="display: block; margin-top: 10px">
+                        Add Race
+                    </a>
+                </div>
             <?php } ?>
         <?php } ?>
     </div>
@@ -424,7 +410,7 @@ foreach ($raceResults as $result) {
     <script>
         function confirmDeletion(event, url) {
             // Display a confirmation dialog
-            const userConfirmed = confirm("Are you sure you want to delete?");
+            const userConfirmed = confirm("Are you sure you want to delete this Race?");
             // If the user did not confirm, prevent the navigation
             if (!userConfirmed) {
                 event.preventDefault();

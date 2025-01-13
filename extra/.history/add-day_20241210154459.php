@@ -71,8 +71,38 @@ if (isset($_POST['submit'])) {
             <span class="error <?= !isset($errors['num_comp']) ? 'hidden' : '' ?>">Please enter the number of competitors.</span>
         </div>
 
-        <button type="submit" name="submit" class="button">Add Day</button>
+        <button type="submit" name="submit">Add Day</button>
     </form>
+
+    <h2>All Days</h2>
+    <div>
+        <?php foreach ($days as $day) {
+            $d_day_id = htmlspecialchars($day['Day_Id']);
+            $d_date = htmlspecialchars($day['Date']);
+            $d_num_comp = htmlspecialchars($day['Num_Comp']);
+            $d_num_races = htmlspecialchars($day['Num_Races']);
+            ?>
+            <div class="horizontal">
+                <b>
+                    <div>Day <?=$d_day_id?></div>
+                    <div><?=$d_date?></div>
+                </b>
+                <div>
+                    <div><?=$d_num_comp?> competitors</div>
+                    <div>
+                        <?php if ($d_num_races == 1) : ?>
+                            <?=$d_num_races?> race
+                        <?php else :?>
+                            <?=$d_num_races?> races
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div>
+                    <a href="add-race.php?guid=<?=$d_day_id?>">Add Race</a>
+                </div>
+            </div>
+        <?php } ?>
+    </div>
     </main>
 </body>
 </html>
