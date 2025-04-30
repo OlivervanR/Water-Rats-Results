@@ -154,7 +154,7 @@ if (isset($_POST['submit'])) {
             } 
         }
 
-        // Add or updata competitors with abbreviations
+        // Add or update competitors with abbreviations
         foreach ($other_competitors as $competitor) {
             $comp_id = $competitor['id'];
             if ($comp_id == null) {
@@ -173,18 +173,20 @@ if (isset($_POST['submit'])) {
                 $query = "UPDATE `Race Results` SET `Notation` = ? WHERE `Comp_Id` = ? AND `Race_Id` = ?";
                 $stmt = $pdo->prepare($query);
                 $stmt->execute([$competitor['notation'], $comp_id, $race_id]);
+                print("Updated notation for competitor $comp_id to " . $competitor['notation']);
             }
             else {
                 // Add the competitor to the current race with the DNC position
                 $query = "INSERT INTO `Race Results` (`Race_Id`, `Position`, `Comp_Id`, `Notation`) VALUES (?, ?, ?, ?)";
                 $stmt_insert = $pdo->prepare($query);
                 $stmt_insert->execute([$race_id, $position, $comp_id, $competitor['notation']]);
+                print("Added competitor $comp_id with notation " . $competitor['notation']);
             }
         }
 
         // Delete the old results
         $og_rr_count = count($og_rr);
-        $og_abb_count - count($og_abb);
+        $og_abb_count = count($og_abb);
         $new_rr_count = count($ranked_competitors);
         $new_abb_count = count($other_competitors);
         if ($og_rr_count > $new_rr_count) {
@@ -260,7 +262,7 @@ if (isset($_POST['submit'])) {
     <title>Edit Race</title>
 </head>
 <body>
-    <?php //include 'nav.php'; ?> 
+    <?php include 'nav.php'; ?> 
 
     <main>
     <h1>Edit Race</h1>

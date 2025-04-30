@@ -12,23 +12,50 @@ $stmt = $pdo->prepare($competitorsQuery);
 $stmt->execute();
 $competitors = $stmt->fetchAll(PDO::FETCH_ASSOC); 
 
-$daysQuery = "SELECT * FROM `Days`";
+// Get the selected year (default to current year if not set)
+$selectedYear = isset($_GET['year']) ? (int)$_GET['year'] : date('Y');
+
+// Modify your queries to filter by year
+$daysQuery = "SELECT * FROM `Days` WHERE `Year` = ? ORDER BY `Day_Number` ASC";
 $stmt = $pdo->prepare($daysQuery);
-$stmt->execute();
+$stmt->execute([$selectedYear]);
 $days = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get all available years for the dropdown
+$yearsQuery = "SELECT DISTINCT `Year` FROM `Days` ORDER BY `Year` DESC";
+$stmt = $pdo->prepare($yearsQuery);
+$stmt->execute();
+$availableYears = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+// If no years found, add current year
+if (empty($availableYears)) {
+    $availableYears = [date('Y')];
+}
 
 $racesQuery = "SELECT * FROM `Races`";
 $stmt = $pdo->prepare($racesQuery);
 $stmt->execute();
 $races = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Modify this query to include the Notation field
 $raceResultsQuery = "
-    SELECT rr.Comp_Id, rr.Race_Id, rr.Position, r.Day_Id 
+    SELECT rr.Comp_Id, rr.Race_Id, rr.Position, rr.Notation, r.Day_Id 
     FROM `Race Results` rr 
     JOIN `Races` r ON rr.Race_Id = r.Race_Id";
 $stmt = $pdo->prepare($raceResultsQuery);
 $stmt->execute();
 $raceResults = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Then modify how you structure the results to include notations
+$resultsPerCompetitor = [];
+$notationsPerCompetitor = []; // Add this array
+foreach ($raceResults as $result) {
+    $resultsPerCompetitor[$result['Comp_Id']][$result['Day_Id']][$result['Race_Id']] = $result['Position'];
+    // Store notations separately
+    if (!empty($result['Notation'])) {
+        $notationsPerCompetitor[$result['Comp_Id']][$result['Race_Id']] = $result['Notation'];
+    }
+}
 
 // Structure the race results in an associative array for easy lookup
 $resultsPerCompetitor = [];
@@ -48,16 +75,18 @@ foreach ($raceResults as $result) {
     <?php include 'nav.php'; ?> 
     
     <main>
-    <div style="text-align: center;">
-        <button class="button" onclick="location.href='#target-section'">Results each day</button>
-        <label for="year" style="font-size: 20px;">Choose Year:</label>
-        <select name="year" id="year">
-            <option value="2023">2025</option>
-            <option value="2024">2024</option>
-            <option value="2025">2023</option>
-        </select>
+    <div class="year-navigation" style="text-align: center;">
+        <?php if (in_array($selectedYear - 1, $availableYears)) { ?>
+            <a href="?year=<?= $selectedYear - 1 ?>" class="button">← <?= $selectedYear - 1 ?></a>
+        <?php } ?>
+        
+        <span class="current-year"><?= $selectedYear ?></span>
+        
+        <?php if (in_array($selectedYear + 1, $availableYears)) { ?>
+            <a href="?year=<?= $selectedYear + 1 ?>" class="button"><?= $selectedYear + 1 ?> →</a>
+        <?php } ?>
     </div>
-    <h1>Final Results</h1>
+    <h1>Final Results <?= $selectedYear ?></h1>
     <p style="text-align: center;">For the Water Rats Laser club racing</p>
 
     <?php
@@ -141,9 +170,22 @@ foreach ($raceResults as $result) {
             return $totalComparison;
         }
 
-        // If the totals are equal, compare by the lowest race position (ascending order)
-        $minA = min(array_filter($a['totals_per_day'], 'is_numeric')); // Get the lowest numeric race position for competitor A
-        $minB = min(array_filter($b['totals_per_day'], 'is_numeric')); // Get the lowest numeric race position for competitor B
+        // Get filtered positions for both competitors
+        $positionsA = array_filter($a['totals_per_day'], 'is_numeric');
+        $positionsB = array_filter($b['totals_per_day'], 'is_numeric');
+        
+        // Check if either array is empty before using min()
+        if (empty($positionsA) && empty($positionsB)) {
+            return 0; // Both have no positions, consider them equal
+        } else if (empty($positionsA)) {
+            return 1; // A has no positions, B comes first
+        } else if (empty($positionsB)) {
+            return -1; // B has no positions, A comes first
+        }
+
+        // If both have positions, compare by the lowest race position
+        $minA = min($positionsA); // Get the lowest numeric race position for competitor A
+        $minB = min($positionsB); // Get the lowest numeric race position for competitor B
 
         $minPositionComparison = $minA <=> $minB;
 
@@ -163,12 +205,9 @@ foreach ($raceResults as $result) {
             return $countComparison;
         }
 
-        // If the counts are equal, compare the next lowest positions sequentially
-        $positionsA = array_filter($a['totals_per_day'], 'is_numeric');
-        $positionsB = array_filter($b['totals_per_day'], 'is_numeric');
-
-        sort($positionsA); // Sort positions for competitor A
-        sort($positionsB); // Sort positions for competitor B
+        // Sort positions for sequential comparison
+        sort($positionsA);
+        sort($positionsB);
 
         // Compare each position in order until a difference is found
         for ($i = 0; $i < min(count($positionsA), count($positionsB)); $i++) {
@@ -181,6 +220,7 @@ foreach ($raceResults as $result) {
         // If all positions compared so far are the same, the competitor with fewer races goes first
         return count($positionsA) <=> count($positionsB);
     });
+
     ?>
     <div class="table-container">
         <table>
@@ -225,7 +265,6 @@ foreach ($raceResults as $result) {
         <div style="text-align: center; "><a href="add-day.php" class="button" style="font-size: 20px; padding: 10px 20px; display: inline-block; text-decoration: none; background-color: blue;">Add Day</a></div>
     <?php } ?>
     
-    <!-- Day display carousel -->
     <div id="target-section">
         <?php 
         // Sort the days array by date in descending order
@@ -260,37 +299,36 @@ foreach ($raceResults as $result) {
                     foreach ($races as $race) {
                         $race_id = htmlspecialchars($race['Race_Id']);
                         $race_dnc = htmlspecialchars($race['DNC']);
-
+                        $dnc_total += $race_dnc;
+                    
                         $query = "SELECT * FROM `Race Results` WHERE `Race_Id` = ? AND `Comp_Id` = ?";
                         $stmt = $pdo->prepare($query);
                         $stmt->execute([$race_id, $comp_id]);
                         $result = $stmt->fetch(PDO::FETCH_ASSOC);
-
+                    
                         if ($result && isset($result['Position'])) {
                             $position = (int)htmlspecialchars($result['Position']);
                             $race_positions[$race_id] = $position;  // Key race positions by Race_Id
-
+                    
                             $notation = $result['Notation'];
                             $notations[$race_id] = $notation;    
-
+                    
                             $total += $position;  // Sum positions to calculate the total
                         } else {
                             $race_positions[$race_id] = $race_dnc; // Use DNC if no position
                             
                             $notation = 'DNC';
                             $notations[$race_id] = $notation;
-
+                    
                             $total += $race_dnc;
                         }
-
-                        $dnc_total += $race_dnc;
                     }
-
+                    
                     // Store competitor data with positions for each race and total points
                     $competitorData[] = [
                         'name' => $name,
                         'number' => $number,
-                        'notations' => $notations,
+                        'notations' => $notations,  // Make sure this is included
                         'race_positions' => $race_positions,
                         'total' => $total,
                         'dnc' => $dnc_total
@@ -307,9 +345,22 @@ foreach ($raceResults as $result) {
                         return $totalComparison;
                     }
                     
-                    // If the totals are equal, compare by the lowest race position
-                    $minA = min(array_filter($a['race_positions'], 'is_numeric')); // Get the lowest numeric race position for competitor A
-                    $minB = min(array_filter($b['race_positions'], 'is_numeric')); // Get the lowest numeric race position for competitor B
+                    // Get filtered positions for both competitors
+                    $positionsA = array_filter($a['race_positions'], 'is_numeric');
+                    $positionsB = array_filter($b['race_positions'], 'is_numeric');
+                    
+                    // Check if either array is empty before using min()
+                    if (empty($positionsA) && empty($positionsB)) {
+                        return 0; // Both have no positions, consider them equal
+                    } else if (empty($positionsA)) {
+                        return 1; // A has no positions, B comes first
+                    } else if (empty($positionsB)) {
+                        return -1; // B has no positions, A comes first
+                    }
+                    
+                    // If both have positions, compare by the lowest race position
+                    $minA = min($positionsA); // Get the lowest numeric race position for competitor A
+                    $minB = min($positionsB); // Get the lowest numeric race position for competitor B
                     
                     $minPositionComparison = $minA <=> $minB;
                 
@@ -349,10 +400,10 @@ foreach ($raceResults as $result) {
                 });
                 ?>
                 <div class="race-day-container">
-                    <h2>Day <?=$day_num?></h2>
+                    <h2>Day <?=htmlspecialchars($day['Day_Number'])?></h2>
                     <div class="date"><?=$date?></div>
                 </div>
-                <div style="display: flex; justify-content: center; align-items: center;">
+                <div class="table-container">
                     <table>
                         <?php if (isset($_SESSION['user'])) { ?>
                             <th></th>
@@ -381,7 +432,18 @@ foreach ($raceResults as $result) {
                         </tr>
 
                         <?php foreach ($competitorData as $index => $comp) {
-                            if ($comp['total'] != $comp['dnc']) { // Filter out competitors who only had DNCs
+                            // Check if the competitor has any actual race results (not just DNCs)
+                            $hasRealResults = false;
+                            foreach ($races as $race) {
+                                $race_id = htmlspecialchars($race['Race_Id']);
+                                if (isset($comp['race_positions'][$race_id]) && 
+                                    $comp['race_positions'][$race_id] != $race['DNC']) {
+                                    $hasRealResults = true;
+                                    break;
+                                }
+                            }
+                            
+                            if ($hasRealResults) { // Only show competitors who actually raced
                             ?>
                             <tr>
                                 <td><b><?=$index + 1?></b></td>
@@ -390,10 +452,10 @@ foreach ($raceResults as $result) {
                                 <?php foreach ($races as $race) { 
                                     $race_id = htmlspecialchars($race['Race_Id']); ?>
                                     <td>
-                                        <?php if ($comp['notations'][$race_id] == null) { 
-                                            echo $comp['race_positions'][$race_id]; // Output the position if not DNC
+                                        <?php if (empty($comp['notations'][$race_id])) { 
+                                            echo $comp['race_positions'][$race_id]; // Output just the position if no notation
                                         } else { 
-                                            echo $comp['notations'][$race_id], " ", ($comp['race_positions'][$race_id]);
+                                            echo $comp['notations'][$race_id] . " " . $comp['race_positions'][$race_id]; // Output notation and position
                                         } ?>
                                     </td>
                                 <?php } ?>
@@ -407,7 +469,7 @@ foreach ($raceResults as $result) {
             else { ?>
                 <?php if (isset($_SESSION['user'])) { ?>
                     <div class="race-day-container">
-                        <h2>Day <?=$day_num?></h2>
+                        <h2>Day <?=htmlspecialchars($day['Day_Number'])?></h2>
                         <div class="date"><?=$date?></div>
                         <a id="add-race" class="button" href="add-race.php?guid=<?= $day_num ?>">
                             Add Race
@@ -433,6 +495,14 @@ foreach ($raceResults as $result) {
                 window.location.href = url;
             }
         }
+    </script>
+    <footer style="text-align: center;">
+        <p>&copy; <span id="year"></span> Oliver van Rossem. All rights reserved.</p>
+    </footer>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('year').textContent = new Date().getFullYear();
+        });
     </script>
     </main>
 </body>
